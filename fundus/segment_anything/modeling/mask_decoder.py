@@ -74,7 +74,7 @@ class MaskDecoder(nn.Module):
         image_pe: torch.Tensor,
         sparse_prompt_embeddings: torch.Tensor,
         dense_prompt_embeddings: torch.Tensor,
-        confidence_score: torch.Tensor,  # 新增参数
+        confidence_score: torch.Tensor,  
         multimask_output: bool,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
@@ -97,18 +97,9 @@ class MaskDecoder(nn.Module):
             image_pe=image_pe,
             sparse_prompt_embeddings=sparse_prompt_embeddings,
             dense_prompt_embeddings=dense_prompt_embeddings,
-            confidence_score=confidence_score  # 添加
+            confidence_score=confidence_score  
         )
 
-        # Select the correct mask or masks for output
-        # if multimask_output:
-        #     mask_slice = slice(1, None)
-        # else:
-        #     mask_slice = slice(0, 1)
-        # masks = masks[:, mask_slice, :, :]
-        # iou_pred = iou_pred[:, mask_slice]
-
-        # Prepare output
         return masks, iou_pred
 
     def predict_masks(
@@ -123,24 +114,20 @@ class MaskDecoder(nn.Module):
 
         B, C, H, W = image_embeddings.shape
 
-        # === 1. 构造 tokens: [B, (1+num_masks+num_prompts), D]
         output_tokens = torch.cat([self.iou_token.weight, self.mask_tokens.weight], dim=0)  # [1+num_masks, D]
         output_tokens = output_tokens.unsqueeze(0).expand(B, -1, -1)  # [B, 1+num_masks, D]
 
         tokens = torch.cat([output_tokens, sparse_prompt_embeddings], dim=1)  # [B, T, D]
 
-        # === 2. 动态融合 image_feature 和 dense_prompt → src
         alpha = confidence_score.view(-1, 1, 1, 1)  # [B, 1, 1, 1]
         src = alpha * dense_prompt_embeddings + (1 - alpha) * image_embeddings  # [B, C, H, W]
         pos_src = image_pe  # [B, C, H, W]
 
-        # === 3. Transformer
         hs, src = self.transformer(src, pos_src, tokens)  # all are [B, ...]
 
         iou_token_out = hs[:, 0, :]  # [B, D]
         mask_tokens_out = hs[:, 1:(1 + self.num_mask_tokens), :]  # [B, num_masks, D]
 
-        # === 4. Mask prediction
         src = src.transpose(1, 2).view(B, C, H, W)
         upscaled_embedding = self.output_upscaling(src)  # [B, C', H', W']
 
