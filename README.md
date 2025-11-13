@@ -1,7 +1,6 @@
-<img width="1508" height="967" alt="image" src="https://github.com/user-attachments/assets/77af1864-ee65-46c3-9f27-05fafaa5cc92" /># Fine‑Grained Perception for Generalized Medical Image Segmentation (MedFineSAM)
+# Fine‑Grained Perception for Generalized Medical Image Segmentation (MedFineSAM)
 
-
-<img width="1508" height="967" alt="image" src="https://github.com/user-attachments/assets/80e90b71-20c3-4e28-9b09-3e748a610dee" />
+<img src="https://github.com/user-attachments/assets/80e90b71-20c3-4e28-9b09-3e748a610dee" width="75%">
 
 ## Requirement
 ``pip install -r requirements.txt``
