@@ -58,7 +58,6 @@ class PromptEncoder(nn.Module):
             nn.Conv2d(mask_in_chans, embed_dim, kernel_size=1),
         )  # downsample to 1/4
         self.no_mask_embed = nn.Embedding(1, embed_dim)
-        # 置信度估计器输入维度 = prompt_dim (embed_dim) + activation_map 通道数（1个值 or 平均）
         self.confidence_mlp = nn.Sequential(
             nn.Linear(embed_dim + 1, embed_dim // 2),
             nn.ReLU(),
@@ -69,7 +68,7 @@ class PromptEncoder(nn.Module):
             num_layers=1,
             embed_dims=embed_dim,
             patch_size=16,
-            token_length=64,  # 可调，根据需要设定
+            token_length=64,  
             use_softmax=True
         )
 
@@ -178,27 +177,19 @@ class PromptEncoder(nn.Module):
             dense_embeddings = self.no_mask_embed.weight.reshape(1, -1, 1, 1).expand(
                 bs, -1, self.image_embedding_size[0], self.image_embedding_size[1]
             )
-        # 使用 Reins 增强 sparse_embeddings 表达能力
-        # 先做 shape 变换为 [seq_len, B, C] 格式
+
         sparse_embeddings_t = sparse_embeddings.permute(1, 0, 2)  # [N, B, C]
 
-        # 通过 Reins 处理后再变回 [B, N, C]
         sparse_embeddings_enhanced = self.reins_prompt(
             sparse_embeddings_t, layer=0, batch_first=False, has_cls_token=False
         ).permute(1, 0, 2)  # [B, N, C]
-        # # 生成 prompt summary 向量 p̂_i：用 sparse embedding 平均表示
-        # prompt_summary = sparse_embeddings.mean(dim=1)  # B x embed_dim
-        # 用增强后的 sparse embedding 来做 prompt summary
         prompt_summary = sparse_embeddings_enhanced.mean(dim=1)
 
-        # 用 dense embedding 生成 activation summary（如 GAP）
-        activation_summary = dense_embeddings.mean(dim=[2, 3])  # B x embed_dim -> 做精简后也可以变为 B x 1
+        activation_summary = dense_embeddings.mean(dim=[2, 3])  
 
-        # 合并输入 [p̂_i, A_i]：
         confidence_input = torch.cat([prompt_summary, activation_summary.mean(dim=1, keepdim=True)],
                                      dim=-1)  # B x (embed_dim + 1)
 
-        # 通过 MLP 得到置信度 α ∈ [0, 1]
         confidence_score = self.confidence_mlp(confidence_input)  # B x 1
 
         return sparse_embeddings, dense_embeddings,confidence_score
