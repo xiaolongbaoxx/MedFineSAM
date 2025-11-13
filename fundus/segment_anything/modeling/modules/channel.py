@@ -1,6 +1,5 @@
 from torch import nn
 
-# ✅ 注意，ChannelGate 定义如下（可放 utils 或单独模块里）：
 class ChannelGate(nn.Module):
     def __init__(self, channel, reduction=4):
         super().__init__()
@@ -17,3 +16,4 @@ class ChannelGate(nn.Module):
         y = self.pool(x).view(b, c)
         y = self.fc(y).view(b, c, 1, 1)
         return x * y
+
