@@ -12,8 +12,7 @@ from typing import Optional, Tuple, Type
 
 from fundus.segment_anything.modeling.adapter.Adapter import Adapter
 from fundus.segment_anything.modeling.adapter.LAdapter import LAdapter
-# 放在与其它 import 同一堆位置
-# from visualizer import get_local   # 新增
+
 
 class MLPBlock(nn.Module):
     def __init__(
@@ -291,7 +290,6 @@ class Attention(nn.Module):
 
         attn = attn.softmax(dim=-1)
         
-        # ② 新增：不改变输出，把 softmax 后的注意力存成 (B, heads, N, N) 放到局部变量
         attn_map = attn.view(B, self.num_heads, H * W, H * W)
 
         x = (attn @ v).view(B, self.num_heads, H, W, -1).permute(0, 2, 3, 1, 4).reshape(B, H, W, -1)
