@@ -14,7 +14,7 @@ from .image_encoder import ImageEncoderViT
 from .mask_decoder import MaskDecoder
 from .memory.memory_prompt import PrototypePromptGenerate
 from .prompt_encoder import PromptEncoder
-from fundus.segment_anything.modeling.modules.vHeat import Heat2D  # 假如你放在 vHeat.py
+from fundus.segment_anything.modeling.modules.vHeat import Heat2D 
 from fundus.segment_anything.modeling.modules.channel import ChannelGate
 
 class Sam(nn.Module):
@@ -48,15 +48,13 @@ class Sam(nn.Module):
         self.mask_decoder = mask_decoder
         self.register_buffer("pixel_mean", torch.Tensor(pixel_mean).view(-1, 1, 1), False)
         self.register_buffer("pixel_std", torch.Tensor(pixel_std).view(-1, 1, 1), False)
-        # ========== 添加 Heat2D 模块 ==========
-        self.heat2d = Heat2D(dim=256, hidden_dim=256)  # 请根据你 encoder 输出通道确定 dim，ViT-B 通常为 256
-        # self.freq_embed = nn.Parameter(torch.randn(14, 14, 256))  # 可以设为 learnable，初始为 14×14×C
+        self.heat2d = Heat2D(dim=256, hidden_dim=256)  
         self.freq_mlp = nn.Sequential(
             nn.Linear(256, 1024),
             nn.ReLU(),
             nn.Linear(1024, 256 * 14 * 14)
         )
-        self.gate_scale = nn.Parameter(torch.tensor(0.5))  # 可学习的增强强度
+        self.gate_scale = nn.Parameter(torch.tensor(0.5)) 
         self.channel_gate = ChannelGate(channel=256)
         # self.freq_mlp = None
 
@@ -71,82 +69,18 @@ class Sam(nn.Module):
             outputs = self.forward_train(batched_input, multimask_output, image_size)
         return outputs
 
-    # def forward_train(self, batched_input, multimask_output, image_size):
-    #     input_images = self.preprocess(batched_input)
-    #     # image_embeddings = self.image_encoder(input_images)
-    #
-    #     image_embeddings = self.image_encoder(input_images)  # shape: [B, C, H, W]
-    #
-    #     # ========== Heat2D 扩散增强 ==========
-    #     B, C, H, W = image_embeddings.shape
-    #     # if self.freq_embed.shape[:2] != (H, W):
-    #     #     resized_freq = F.interpolate(
-    #     #         self.freq_embed.permute(2, 0, 1).unsqueeze(0),  # [1, C, H0, W0]
-    #     #         size=(H, W),
-    #     #         mode='bicubic',
-    #     #         align_corners=False
-    #     #     ).squeeze(0).permute(1, 2, 0).contiguous()
-    #     # else:
-    #     #     resized_freq = self.freq_embed
-    #     # === 从原型向量生成 freq_embed ===
-    #     # prototype = self.prompt_generator.get_prototype_vector()  # [B, 256]
-    #     sparse_embeddings, dense_prompt, confidence_score, prototype = self.prompt_generator(image_embeddings,
-    #                                                                                          return_proto=True)
-    #     if self.freq_mlp is None:
-    #         self.freq_mlp = nn.Sequential(
-    #             nn.Linear(prototype.shape[-1], 1024),
-    #             nn.ReLU(),
-    #             nn.Linear(1024, 256 * 14 * 14)
-    #         ).to(prototype.device)
-    #     freq_embed = self.freq_mlp(prototype).view(B, 14, 14, 256)  # [B, H, W, C]
-    #
-    #     # === 尺寸适配到 H×W ===
-    #     freq_embed = freq_embed.permute(0, 3, 1, 2)  # [B, C, H, W]
-    #     freq_embed = F.interpolate(freq_embed, size=(H, W), mode='bicubic', align_corners=False)
-    #     freq_embed = freq_embed.permute(0, 2, 3, 1).contiguous()  # [B, H, W, C]
-    #     print(">>> freq_embed shape before Heat2D:", freq_embed.shape)
-    #     # heat_feature = self.heat2d(image_embeddings, resized_freq)
-    #     heat_feature = self.heat2d(image_embeddings, freq_embed)
-    #
-    #     # image_embeddings = image_embeddings + heat_feature
-    #     gated_heat = self.channel_gate(heat_feature)
-    #     image_embeddings = image_embeddings + 0.3*gated_heat
-    #     sparse_embeddings, dense_prompt, confidence_score = self.prompt_generator(image_embeddings)
-    #
-    #     low_res_masks, iou_predictions = self.mask_decoder(
-    #         image_embeddings=image_embeddings,
-    #         image_pe=self.prompt_generator.get_dense_pe(),
-    #         sparse_prompt_embeddings=sparse_embeddings,
-    #         dense_prompt_embeddings=dense_prompt,
-    #         confidence_score=confidence_score,
-    #         multimask_output=multimask_output
-    #     )
-    #     masks = self.postprocess_masks(
-    #         low_res_masks,
-    #         input_size=(image_size, image_size),
-    #         original_size=(image_size, image_size)
-    #     )
-    #     outputs = {
-    #         'masks': masks,
-    #         'iou_predictions': iou_predictions,
-    #         'low_res_logits': low_res_masks
-    #     }
-    #     return outputs
+
     def forward_train(self, batched_input, multimask_output, image_size):
-        # 1. 预处理 + 编码
         input_images = self.preprocess(batched_input)
         image_embeddings = self.image_encoder(input_images)  # [B, C, H, W]
         B, C, H, W = image_embeddings.shape
 
-        # 2. 生成热扩散特征
         sparse_emb, dense_prompt, iou_score, prototype = self.prompt_generator(
             image_embeddings, return_proto=True)
-        freq_embed = self._make_freq_embed(prototype, H, W)  # 参见下方辅助函数
+        freq_embed = self._make_freq_embed(prototype, H, W)
         heat_feature = self.heat2d(image_embeddings, freq_embed)  # [B, C, H, W]
-        gated_heat = self.channel_gate(heat_feature)  # 通道注意力融合
+        gated_heat = self.channel_gate(heat_feature)
 
-        # === 空间选择性增强部分 ===
-        # 3. 第一阶段：粗分割
         low_res_logits, _ = self.mask_decoder(
             image_embeddings=image_embeddings,
             image_pe=self.prompt_generator.get_dense_pe(),
@@ -155,20 +89,19 @@ class Sam(nn.Module):
             confidence_score=iou_score,
             multimask_output=multimask_output
         )
-        # 4. 插值到 [B,1,H,W] 并 sigmoid 得到空间掩码
+
         mask_sp = F.interpolate(
             low_res_logits.sigmoid(), size=(H, W),
             mode='bilinear', align_corners=False
         ).clamp(0, 1)  # [B,1,H,W]
-        # ↓ 在这里加一行，把它变成 [B,1,H,W]：
-        mask_sp = mask_sp[:, :1, :, :]  # 或者 mask_sp = mask_sp.mean(1, True)
-        # 5. 只在 mask 内做增强
-        gated_heat_sp = gated_heat * mask_sp  # 广播到 C 通道
+        
+        mask_sp = mask_sp[:, :1, :, :]  
+
+        gated_heat_sp = gated_heat * mask_sp  
         image_embeddings = image_embeddings \
                            + self.gate_scale * gated_heat_sp
-        # === 空间选择性增强完毕 ===
 
-        # 6. 第二阶段：带增强的最终分割
+
         sparse2, dense2, iou2 = self.prompt_generator(image_embeddings)
         low_res_masks, iou_predictions = self.mask_decoder(
             image_embeddings=image_embeddings,
@@ -242,19 +175,9 @@ class Sam(nn.Module):
         """
         input_images = torch.stack([self.preprocess(x["image"]) for x in batched_input], dim=0)
         image_embeddings = self.image_encoder(input_images)
-        # ===== Heat2D 结构增强（与 forward_train 保持一致）=====
-        B, C, H, W = image_embeddings.shape
-        # if self.freq_embed.shape[:2] != (H, W):
-        #     resized_freq = F.interpolate(
-        #         self.freq_embed.permute(2, 0, 1).unsqueeze(0),
-        #         size=(H, W),
-        #         mode='bicubic',
-        #         align_corners=False
-        #     ).squeeze(0).permute(1, 2, 0).contiguous()
-        # else:
-        #     resized_freq = self.freq_embed
 
-        # prototype = self.prompt_generator.get_prototype_vector()  # 或预生成
+        B, C, H, W = image_embeddings.shape
+
         sparse_embeddings, dense_prompt, confidence_score, prototype = self.prompt_generator(image_embeddings,
                                                                                              return_proto=True)
         freq_embed = self.freq_mlp(prototype).view(B, 14, 14, 256)
