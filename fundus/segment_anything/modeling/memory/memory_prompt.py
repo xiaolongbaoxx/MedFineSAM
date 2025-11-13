@@ -85,7 +85,6 @@ class PrototypePromptGenerate(nn.Module):
         self.memory_bank = MemoryUnit(mem_dim, embed_dim)
         self.pe_layer = PositionEmbeddingRandom(embed_dim // 2)
         self.image_embedding_size = (image_embedding_size, image_embedding_size)
-        # confidence MLP：输入为 prototype 和 activation summary 拼接向量（256 + 1 = 257）
         self.confidence_mlp = nn.Sequential(
             nn.Linear(embed_dim + 1, embed_dim // 2),
             nn.ReLU(),
@@ -121,30 +120,14 @@ class PrototypePromptGenerate(nn.Module):
         cos_sim_map = cos_sim_map.unsqueeze(1)# b x 1 x h x w
 
         prompt = self.fuse_conv(torch.concat([feature, info_proto, cos_sim_map], dim=1))
-
-#         # di_proto: [B, C]
-#         proto_summary = di_proto  # [B, C]
-
-#         # cos_sim_map: [B, 1, H, W] → 取平均后 [B, 1]
-#         activation_summary = torch.mean(cos_sim_map, dim=[2, 3])  # [B, 1]
-
-#         # 拼接两个 [B, C] 和 [B, 1] → 得到 [B, C+1]
-#         confidence_input = torch.cat([proto_summary, activation_summary], dim=1)  # [B, C+1]
-#         confidence_score = self.confidence_mlp(confidence_input)  # [B, 1]
-        # di_proto 目前是 [B, C, 1, 1]
         proto_summary = di_proto.squeeze(-1).squeeze(-1)  # → [B, C]
 
-        # cos_sim_map 是 [B, 1, H, W]
         activation_summary = cos_sim_map.mean(dim=[2, 3]) # [B, 1]
 
         confidence_input = torch.cat([proto_summary, activation_summary], dim=1)  # [B, C+1]
         confidence_score = self.confidence_mlp(confidence_input)                  # [B, 1]
         sparse_embeddings = torch.empty((N, 0, C), device=feature.device)
 
-        # # raw_proto = self.global_avg_pool(feature).squeeze(-1).squeeze(-1)  # [B, C]
-        # raw_proto = F.adaptive_avg_pool2d(feature, 1).squeeze(-1).squeeze(-1)
-        # di_proto_vec = di_proto.squeeze(-1).squeeze(-1)  # [B, C]
-        # return sparse_embeddings, prompt, confidence_score
         if return_proto:
             return sparse_embeddings, prompt, confidence_score, proto_summary  # [B, 256]
         else:
