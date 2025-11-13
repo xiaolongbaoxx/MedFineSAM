@@ -7,12 +7,11 @@
 
 
 ## Data Preparation
-[Prostate Segmentation](https://liuquande.github.io/SAML/)
-[Drishti-GS](https://www.kaggle.com/datasets/lokeshsaipureddi/drishtigs-retina-dataset-for-onh-segmentation/data)
-[RIM-ONE r3]()
-[RIGA+ Segmentation](https://zenodo.org/records/6325549)
-We got the REFUGE datasets from [PCSDG](https://github.com/HopkinsKwong/PCSDG)
-
+[Prostate Segmentation](https://liuquande.github.io/SAML/)<br>
+[Drishti-GS](https://www.kaggle.com/datasets/lokeshsaipureddi/drishtigs-retina-dataset-for-onh-segmentation/data)<br>
+[RIM-ONE r3]()<br>
+[RIGA+ Segmentation](https://zenodo.org/records/6325549)<br>
+We got the REFUGE datasets from [PCSDG](https://github.com/HopkinsKwong/PCSDG)<br>
 
 Please download the pretrained [SAM model](https://drive.google.com/file/d/1_oCdoEEu3mNhRfFxeWyRerOKt8OEUvcg/view?usp=share_link) 
 (provided by the original repository of SAM) and put it in the ./pretrained folder. 
