@@ -223,31 +223,13 @@ class Heat2D(nn.Module):
         x = F.conv1d(x.contiguous().view(B, H, -1), weight_cosn.contiguous().view(N, H, 1))
         x = F.conv1d(x.contiguous().view(-1, W, C), weight_cosm.contiguous().view(M, W, 1)).contiguous().view(B, N, M,
                                                                                                               -1)
-        # print("x.shape      =", x.shape)  # 应该是 [B, N, M, C]
-        # print("weight_exp.shape =", weight_exp.shape)  # 应该是 [N, M, C]
 
-
-        # if self.infer_mode:
-        #     # 如果是在 infer_mode，打印 self.k_exp.shape
-        #     print("self.k_exp.shape =", self.k_exp.shape)
-        #     x = torch.einsum("bnmc,bnmc->bnmc", x, self.k_exp)
-        # else:
-        #     weight_exp = torch.pow(weight_exp[:, :, None], self.to_k(freq_embed))
-        #     print("weight_exp.shape =", weight_exp.shape)
-        #     x = torch.einsum("bnmc,bnmc -> bnmc", x, weight_exp)  # exp decay
-        raw_decay_map = weight_exp  # 这是你从 __WEIGHT_EXP__ 里得到的原始 [N,M] 衰减图
+        raw_decay_map = weight_exp
         if self.infer_mode:
-            # infer 模式：使用事先算好的 k_exp，它最好是 [1,N,M,C] 或 [B,N,M,C]
-            # print("self.k_exp.shape =", self.k_exp.shape)
-            # 直接逐元素相乘，自动广播到 [B,N,M,C]
             x = x * self.k_exp
         else:
-            # 训练模式：对每个样本按 channel 动态算指数衰减
-            # to_k(freq_embed) 输出 [B, N, M, C]
             dyn_k = self.to_k(freq_embed)  # [B, N, M, C]
-            # raw_decay_map[:, :, None] 是 [N, M, 1]，广播后和 dyn_k 对齐
             weight_exp_dyn = torch.pow(raw_decay_map[:, :, None], dyn_k)  # [B, N, M, C]
-            # print("weight_exp_dyn.shape =", weight_exp_dyn.shape)
             x = x * weight_exp_dyn
 
         x = F.conv1d(x.contiguous().view(B, N, -1), weight_cosn.t().contiguous().view(H, N, 1))
@@ -494,4 +476,5 @@ if __name__ == "__main__":
     model = vHeat().cuda()
     input = torch.randn((1, 3, 224, 224), device=torch.device('cuda'))
     analyze = FlopCountAnalysis(model, (input,))
+
     print(flop_count_str(analyze))
