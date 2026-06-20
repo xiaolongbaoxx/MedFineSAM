@@ -63,4 +63,4 @@ CUDA_VISIBLE_DEVICES=0 python test.py \
 ## Acknowledgement
 
 We appreciate the developers of [Segment Anything Model](https://github.com/facebookresearch/segment-anything). 
-The code of DAPSAM is built upon [DAPSAM](https://github.com/wkklavis/DAPSAM), and we express our gratitude to these projects.
+The code of MedFineSAM is built upon [DAPSAM](https://github.com/wkklavis/DAPSAM), and we express our gratitude to these projects.
